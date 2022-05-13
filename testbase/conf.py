@@ -52,7 +52,7 @@ import qtaf_settings
 from testbase import logger
 from testbase.exlib import ExLibManager
 
-_DEFAULT_SETTINSG_MODULE = "settings"
+_DEFAULT_SETTINGS_MODULE = "settings"
 
 
 class _Settings(object):
@@ -132,7 +132,7 @@ class _Settings(object):
                     fd, dir_path, desc = imp.find_module(parts_temp[0])
                 del parts_temp[0]
         else:
-            fd, dir_path, desc = imp.find_module(_DEFAULT_SETTINSG_MODULE)
+            fd, dir_path, desc = imp.find_module(_DEFAULT_SETTINGS_MODULE)
         return imp.load_module(import_name, fd, dir_path, desc)
 
     def _load_setting_from_module(self, module):
