@@ -269,6 +269,8 @@ class TestResultBase(object):
         :param attachments: 附件
         :type attachments: dict
         """
+        if not self.__accept_result:
+            return
         if record is None:
             record = {}
         if attachments is None:
@@ -279,6 +281,7 @@ class TestResultBase(object):
         if level >= EnumLogLevel.ERROR:
             if self.__testcase.current_stage:
                 self.add_failed_stage(self.__testcase.current_stage)
+            print("[%s][step: %s]add error log: %s" % (self.testcase.test_name, self.__curr_step, msg))
             self.__steps_passed[self.__curr_step] = False
             if level > self.__error_level:
                 self.__error_level = level

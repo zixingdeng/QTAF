@@ -353,7 +353,7 @@ class TestLoader(object):
         tests = []
         if datadrive.is_datadrive(cls) or settings.DATA_DRIVE:
             try:
-                tests = datadrive.load_datadrive_tests(cls, data_key, attrs)
+                tests = datadrive.load_datadrive_tests(cls, data_key, attrs=attrs)
             except ValueError:
                 self._module_errs[
                     "%s.%s/%s" % (cls.__module__, cls.__name__, data_key)

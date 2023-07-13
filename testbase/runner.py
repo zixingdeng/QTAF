@@ -378,6 +378,7 @@ class BaseTestRunner(object):
         :returns: boolean - 测试是否通过
         """
         test.test_resmgr = self._resmgr
+        test.test_report = self.report
         if isinstance(test, TestCase):
             test.share_data_mgr = self._share_data_mgr  # 用于传递共享数据
         elif isinstance(test, TestSuiteBase):

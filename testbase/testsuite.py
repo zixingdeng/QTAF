@@ -26,7 +26,7 @@ import six
 
 from testbase.testcase import ITestCaseRunner, TestCase, TestCaseRunner
 from testbase.testresult import StreamResult, TestResultCollection
-from testbase.util import ThreadGroupLocal, ThreadGroupScope
+from testbase.util import ThreadGroupLocal, ThreadGroupScope, ShareDataManager
 
 
 class SeqTestCaseRunner(ITestCaseRunner):
@@ -187,6 +187,7 @@ class TestSuiteCaseRunner(ITestCaseRunner):
         self._exec_mode = exec_mode
         self._stop_on_failure = stop_on_failure
         self._concurrency = concurrency
+        self._share_data_mgr = ShareDataManager()
 
     def _log_testsuite_error(self, testsuite, testresult, message):
         """记录测试用例套执行错误"""
@@ -196,7 +197,7 @@ class TestSuiteCaseRunner(ITestCaseRunner):
             ThreadGroupLocal().testresult = testresult
             testresult.error(message)
 
-    def _run_test(self, testsuite, test, testresult_factory, testresult):
+    def _run_test(self, testsuite, test, runner, testresult_factory, testresult):
         """执行测试用例"""
         step_name = test.test_name
         if isinstance(test, TestSuite):
@@ -205,14 +206,23 @@ class TestSuiteCaseRunner(ITestCaseRunner):
             testsuite.root_test_result.begin_step(step_name)
         testresult.begin_step(step_name)
         testsuite.current_stage = test.test_name
-        runner = getattr(test, "case_runner", TestCaseRunner())
+        test.test_report = testsuite.test_report
         if isinstance(test, TestSuite):
             test.root_test_result = testsuite.root_test_result
+        if isinstance(test, TestCase):
+            test.share_data_mgr = self._share_data_mgr  # 用于传递共享数据
+        elif isinstance(test, TestSuiteBase):
+            test.share_data_mgr = self._share_data_mgr
+            test.case_runner._share_data_mgr = self._share_data_mgr
+            for it in test:
+                it.share_data_mgr = self._share_data_mgr
+        runner._share_data_mgr = self._share_data_mgr
         case_result = runner.run(test, testresult_factory)
         if not case_result.passed:
             self._log_testsuite_error(
                 testsuite, testresult, "TestCase %s run failed" % test.test_name
             )
+        test.test_report.log_test_result(case_result.testcase, case_result)
         return case_result
 
     def sequential_run(
@@ -232,11 +242,13 @@ class TestSuiteCaseRunner(ITestCaseRunner):
         passed = True
         results = [testresult]
         for it in testsuite:
-            case_result = self._run_test(testsuite, it, testresult_factory, testresult)
+            runner = getattr(it, "case_runner", TestCaseRunner())
+            case_result = self._run_test(testsuite, it, runner, testresult_factory, testresult)
             passed &= case_result.passed
-            results.append(case_result)
+            results.insert(0, case_result)
             if not passed and stop_on_failure:
                 break
+        return testresult
         return TestResultCollection(results, passed)
 
     def _run_test_from_queue(
@@ -264,11 +276,16 @@ class TestSuiteCaseRunner(ITestCaseRunner):
                 if len(tests_queue) <= 0:
                     break
                 test = tests_queue.pop()
+            runner_cls = type(getattr(test, "case_runner", TestCaseRunner()))
+            if isinstance(test, TestSuite) and issubclass(runner_cls, TestSuiteCaseRunner):
+                runner = runner_cls(test.exec_mode, test.stop_on_failure, test.concurrency)
+            else:
+                runner = runner_cls()
             case_result = self._run_test(
-                testsuite, test, testresult_factory, testresult
+                testsuite, test, runner, testresult_factory, testresult
             )
             with lock:
-                test_result_dict.append(case_result)
+                test_result_dict.insert(0, case_result)
 
     def parallel_run(self, testsuite, testresult_factory, testresult, concurrency):
         """并行执行用例
@@ -307,6 +324,7 @@ class TestSuiteCaseRunner(ITestCaseRunner):
             if not result.passed:
                 passed = False
                 break
+        return testresult
         return TestResultCollection(results, passed)
 
     def run(self, testsuite, testresult_factory):
@@ -433,7 +451,7 @@ class TestSuite(TestSuiteBase):
         :return: TestResult
         """
         if self.__testresults:
-            return self.__testresults[0]
+            return self.__testresults[-1]
         return None
 
     @property
@@ -443,7 +461,7 @@ class TestSuite(TestSuiteBase):
         :return: TestResultCollection
         """
         if len(self.__testresults) > 1:
-            return self.__testresults[1:]
+            return self.__testresults[:-1]
         return []
 
     @property
