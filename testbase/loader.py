@@ -297,6 +297,7 @@ class TestLoader(object):
         """从测试用例套类加载测试用例"""
         tests = []
         for test in cls.testcases:
+            case_attrs = attrs[test] if test in attrs else attrs
             if isinstance(test, str):
                 test = self._load(test)
             if not isinstance(test, type):
@@ -305,7 +306,7 @@ class TestLoader(object):
                         test,
                         data_key,
                         exclude_data_key=exclude_data_key,
-                        attrs=attrs,
+                        attrs=case_attrs,
                         ignore_testsuite=True,
                     )
                 else:
@@ -313,18 +314,18 @@ class TestLoader(object):
                         test,
                         data_key,
                         exclude_data_key=exclude_data_key,
-                        attrs=attrs,
+                        attrs=case_attrs,
                         ignore_testsuite=True,
                     )
             else:
                 if issubclass(test, TestSuite):
                     testcases = self._load_from_testsuite(
-                        test, data_key, exclude_data_key=exclude_data_key, attrs=attrs
+                        test, data_key, exclude_data_key=exclude_data_key, attrs=case_attrs
                     )
                     tests += [test(testcases)]
                 else:
                     tests += self._load_from_class(
-                        test, data_key, exclude_data_key=exclude_data_key, attrs=attrs
+                        test, data_key, exclude_data_key=exclude_data_key, attrs=case_attrs
                     )
 
         return [it for it in tests if not cls.filter(it)]
